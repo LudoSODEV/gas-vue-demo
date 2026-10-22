@@ -2,7 +2,7 @@
 	<div class="app-container">
 		<header class="app-header">
 			<h1>GAS Vue Demo</h1>
-			<p class="subtitle">Stateful Multi-Tool Application (GAS Deployed)</p>
+			<p class="subtitle">Stateful Multi-Tool Application (google.script.history)</p>
 		</header>
 
 		<div class="main-layout">
@@ -96,21 +96,28 @@ export default {
 			return toolComponentMap[currentTool.value] || Tool1_1
 		})
 
-		const parseUrlState = () =>
+		const applyState = (secId, toolId) =>
 		{
-			// 1. Check query parameters (e.g. ?section=sect1&tool=tool1-1 or ?sect=...&tool=...)
+			if (toolComponentMap[toolId])
+			{
+				currentSection.value = secId
+				currentTool.value = toolId
+			}
+		}
+
+		const parseInitialState = () =>
+		{
+			// 1. Check query parameters
 			const params = new URLSearchParams(window.location.search)
 			const qSec = params.get('section') || params.get('sect')
 			const qTool = params.get('tool')
-
 			if (qSec && qTool && toolComponentMap[qTool])
 			{
-				currentSection.value = qSec
-				currentTool.value = qTool
+				applyState(qSec, qTool)
 				return true
 			}
 
-			// 2. Check hash fragments (e.g. #sect1/tool1-1)
+			// 2. Check hash fragments
 			const hash = window.location.hash.replace('#', '')
 			if (hash)
 			{
@@ -121,8 +128,7 @@ export default {
 					const tool = parts[1]
 					if (toolComponentMap[tool])
 					{
-						currentSection.value = sec
-						currentTool.value = tool
+						applyState(sec, tool)
 						return true
 					}
 				}
@@ -131,52 +137,94 @@ export default {
 			return false
 		}
 
-		const updateUrlState = (secId, toolId) =>
+		const updateHistoryState = (secId, toolId, isPush = true) =>
 		{
-			// Update both query params and hash for maximum GAS iframe compatibility
-			const url = new URL(window.location.href)
-			url.searchParams.set('section', secId)
-			url.searchParams.set('tool', toolId)
-			url.hash = `#${secId}/${toolId}`
+			const token = `${secId}/${toolId}`
+			const stateObj = { section: secId, tool: toolId }
 
-			try
+			if (typeof google !== 'undefined' && google.script && google.script.history)
 			{
-				window.history.replaceState({}, '', url.toString())
+				if (isPush)
+				{
+					google.script.history.push(stateObj, token)
+				}
+				else
+				{
+					google.script.history.replace(stateObj, token)
+				}
 			}
-			catch (err)
+			else
 			{
-				// Fallback to hash if history API is restricted
-				window.location.hash = `#${secId}/${toolId}`
+				// Fallback to HTML5 History API & hash for local development
+				const url = new URL(window.location.href)
+				url.searchParams.set('section', secId)
+				url.searchParams.set('tool', toolId)
+				url.hash = `#${token}`
+				if (isPush)
+				{
+					window.history.pushState(stateObj, '', url.toString())
+				}
+				else
+				{
+					window.history.replaceState(stateObj, '', url.toString())
+				}
 			}
 		}
 
 		const selectTool = (secId, toolId) =>
 		{
-			currentSection.value = secId
-			currentTool.value = toolId
-			updateUrlState(secId, toolId)
+			applyState(secId, toolId)
+			updateHistoryState(secId, toolId, true)
 		}
 
-		const handlePopState = () =>
+		const handlePopState = (e) =>
 		{
-			parseUrlState()
+			if (e && e.state && e.state.section && e.state.tool)
+			{
+				applyState(e.state.section, e.state.tool)
+			}
+			else
+			{
+				parseInitialState()
+			}
 		}
 
 		onMounted(() =>
 		{
-			const found = parseUrlState()
+			const found = parseInitialState()
 			if (!found)
 			{
-				updateUrlState(currentSection.value, currentTool.value)
+				updateHistoryState(currentSection.value, currentTool.value, false)
 			}
-			window.addEventListener('popstate', handlePopState)
-			window.addEventListener('hashchange', handlePopState)
+			else
+			{
+				updateHistoryState(currentSection.value, currentTool.value, false)
+			}
+
+			if (typeof google !== 'undefined' && google.script && google.script.history)
+			{
+				google.script.history.setChangeHandler((e) =>
+				{
+					if (e && e.state && e.state.section && e.state.tool)
+					{
+						applyState(e.state.section, e.state.tool)
+					}
+				})
+			}
+			else
+			{
+				window.addEventListener('popstate', handlePopState)
+				window.addEventListener('hashchange', handlePopState)
+			}
 		})
 
 		onUnmounted(() =>
 		{
-			window.removeEventListener('popstate', handlePopState)
-			window.removeEventListener('hashchange', handlePopState)
+			if (typeof google === 'undefined' || !google.script || !google.script.history)
+			{
+				window.removeEventListener('popstate', handlePopState)
+				window.removeEventListener('hashchange', handlePopState)
+			}
 		})
 
 		return {
