@@ -4,6 +4,9 @@
 		<meta charset="UTF-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 		<title>GAS Vue App</title>
+		<script>
+			window.INITIAL_PARAMS = <?!= typeof initialParams !== 'undefined' ? initialParams : '{}' ?>;
+		</script>
 	</head>
 	<body>
 		<div id="app"></div>

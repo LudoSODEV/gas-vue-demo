@@ -1,7 +1,9 @@
-function doGet()
+function doGet(e)
 {
-	return HtmlService.createHtmlOutputFromFile('Page')
-		.setTitle('GAS Vue Web App')
+	const template = HtmlService.createTemplateFromFile('Page');
+	template.initialParams = JSON.stringify(e && e.parameter ? e.parameter : {});
+	return template.evaluate()
+		.setTitle('GAS Stateful Vue App')
 		.setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 

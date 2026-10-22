@@ -2,7 +2,7 @@
 	<div class="app-container">
 		<header class="app-header">
 			<h1>GAS Vue Demo</h1>
-			<p class="subtitle">Stateful Multi-Tool Application</p>
+			<p class="subtitle">Stateful Multi-Tool Application (google.script.history Spec)</p>
 		</header>
 
 		<div class="main-layout">
@@ -105,41 +105,44 @@ export default {
 			}
 		}
 
-		const parseQueryState = () =>
+		const updateHistory = (secId, toolId, isReplace = false) =>
 		{
-			const params = new URLSearchParams(window.location.search)
-			const qSec = params.get('section') || params.get('sect')
-			const qTool = params.get('tool')
-			if (qSec && qTool && toolComponentMap[qTool])
-			{
-				applyState(qSec, qTool)
-				return true
-			}
-			return false
-		}
+			const stateObject = { section: secId, tool: toolId }
+			const queryParams = { section: secId, tool: toolId }
 
-		const updateQueryState = (secId, toolId, isPush = true) =>
-		{
-			const url = new URL(window.location.href)
-			url.searchParams.set('section', secId)
-			url.searchParams.set('tool', toolId)
-			url.hash = '' // Ensure no hash is used
-
-			const stateObj = { section: secId, tool: toolId }
-			if (isPush)
+			if (window.google?.script?.history)
 			{
-				window.history.pushState(stateObj, '', url.toString())
+				if (isReplace)
+				{
+					google.script.history.replace(stateObject, queryParams, '')
+				}
+				else
+				{
+					google.script.history.push(stateObject, queryParams, '')
+				}
 			}
 			else
 			{
-				window.history.replaceState(stateObj, '', url.toString())
+				// Fallback for local development
+				const url = new URL(window.location.href)
+				url.searchParams.set('section', secId)
+				url.searchParams.set('tool', toolId)
+				url.hash = ''
+				if (isReplace)
+				{
+					window.history.replaceState(stateObject, '', url.toString())
+				}
+				else
+				{
+					window.history.pushState(stateObject, '', url.toString())
+				}
 			}
 		}
 
 		const selectTool = (secId, toolId) =>
 		{
 			applyState(secId, toolId)
-			updateQueryState(secId, toolId, true)
+			updateHistory(secId, toolId, false)
 		}
 
 		const handlePopState = (e) =>
@@ -150,31 +153,71 @@ export default {
 			}
 			else
 			{
-				const found = parseQueryState()
-				if (!found)
+				const params = new URLSearchParams(window.location.search)
+				const sec = params.get('section') || params.get('sect') || 'sect1'
+				const tool = params.get('tool') || 'tool1-1'
+				if (toolComponentMap[tool])
 				{
-					applyState('sect1', 'tool1-1')
+					applyState(sec, tool)
 				}
 			}
 		}
 
 		onMounted(() =>
 		{
-			const found = parseQueryState()
-			if (!found)
+			// 1. Check initial params injected from server (window.INITIAL_PARAMS)
+			const initialParams = window.INITIAL_PARAMS || {}
+			const initSec = initialParams.section || initialParams.sect
+			const initTool = initialParams.tool
+
+			if (initSec && initTool && toolComponentMap[initTool])
 			{
-				updateQueryState(currentSection.value, currentTool.value, false)
+				applyState(initSec, initTool)
+				updateHistory(initSec, initTool, true)
 			}
 			else
 			{
-				updateQueryState(currentSection.value, currentTool.value, false)
+				// 2. Check browser query parameters
+				const params = new URLSearchParams(window.location.search)
+				const qSec = params.get('section') || params.get('sect')
+				const qTool = params.get('tool')
+
+				if (qSec && qTool && toolComponentMap[qTool])
+				{
+					applyState(qSec, qTool)
+					updateHistory(qSec, qTool, true)
+				}
+				else
+				{
+					updateHistory(currentSection.value, currentTool.value, true)
+				}
 			}
-			window.addEventListener('popstate', handlePopState)
+
+			if (window.google?.script?.history)
+			{
+				google.script.history.setChangeHandler((e) =>
+				{
+					const params = e.location?.parameters || {}
+					const sec = params.section || params.sect || 'sect1'
+					const tool = params.tool || 'tool1-1'
+					if (toolComponentMap[tool])
+					{
+						applyState(sec, tool)
+					}
+				})
+			}
+			else
+			{
+				window.addEventListener('popstate', handlePopState)
+			}
 		})
 
 		onUnmounted(() =>
 		{
-			window.removeEventListener('popstate', handlePopState)
+			if (!window.google?.script?.history)
+			{
+				window.removeEventListener('popstate', handlePopState)
+			}
 		})
 
 		return {
