@@ -2,7 +2,7 @@
 	<div class="app-container">
 		<header class="app-header">
 			<h1>GAS Vue Demo</h1>
-			<p class="subtitle">Stateful Multi-Tool Application (google.script.history Spec)</p>
+			<p class="subtitle">Stateful Multi-Tool Application</p>
 		</header>
 
 		<div class="main-layout">
@@ -12,7 +12,7 @@
 					<ul class="tool-list">
 						<li v-for="tool in section.tools" :key="tool.id">
 							<a
-								href="#"
+								:href="getToolUrl(section.id, tool.id)"
 								@click.prevent="selectTool(section.id, tool.id)"
 								:class="{ active: currentSection === section.id && currentTool === tool.id }"
 							>
@@ -103,6 +103,11 @@ export default {
 				currentSection.value = secId
 				currentTool.value = toolId
 			}
+		}
+
+		const getToolUrl = (secId, toolId) =>
+		{
+			return `?section=${secId}&tool=${toolId}`
 		}
 
 		const updateHistory = (secId, toolId, isReplace = false) =>
@@ -225,6 +230,7 @@ export default {
 			currentSection,
 			currentTool,
 			currentToolComponent,
+			getToolUrl,
 			selectTool
 		}
 	}
