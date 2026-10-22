@@ -6,6 +6,7 @@
 		<title>GAS Vue App</title>
 		<script>
 			window.INITIAL_PARAMS = <?!= typeof initialParams !== 'undefined' ? initialParams : '{}' ?>;
+			window.DEPLOYMENT_URL = <?!= typeof deploymentUrl !== 'undefined' ? JSON.stringify(deploymentUrl) : '""' ?>;
 		</script>
 	</head>
 	<body>

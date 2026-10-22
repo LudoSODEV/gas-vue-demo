@@ -107,7 +107,8 @@ export default {
 
 		const getToolUrl = (secId, toolId) =>
 		{
-			return `?section=${secId}&tool=${toolId}`
+			const baseUrl = window.DEPLOYMENT_URL || ''
+			return `${baseUrl}?section=${secId}&tool=${toolId}`
 		}
 
 		const updateHistory = (secId, toolId, isReplace = false) =>
