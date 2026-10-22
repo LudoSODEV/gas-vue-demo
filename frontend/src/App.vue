@@ -2,7 +2,7 @@
 	<div class="app-container">
 		<header class="app-header">
 			<h1>GAS Vue Demo</h1>
-			<p class="subtitle">Stateful Multi-Tool Application</p>
+			<p class="subtitle">Stateful Multi-Tool Application (GAS Deployed)</p>
 		</header>
 
 		<div class="main-layout">
@@ -96,23 +96,57 @@ export default {
 			return toolComponentMap[currentTool.value] || Tool1_1
 		})
 
-		const parseHash = () =>
+		const parseUrlState = () =>
 		{
-			const hash = window.location.hash.replace('#', '')
-			if (!hash)
+			// 1. Check query parameters (e.g. ?section=sect1&tool=tool1-1 or ?sect=...&tool=...)
+			const params = new URLSearchParams(window.location.search)
+			const qSec = params.get('section') || params.get('sect')
+			const qTool = params.get('tool')
+
+			if (qSec && qTool && toolComponentMap[qTool])
 			{
-				return
+				currentSection.value = qSec
+				currentTool.value = qTool
+				return true
 			}
-			const parts = hash.split('/')
-			if (parts.length >= 2)
+
+			// 2. Check hash fragments (e.g. #sect1/tool1-1)
+			const hash = window.location.hash.replace('#', '')
+			if (hash)
 			{
-				const sec = parts[0]
-				const tool = parts[1]
-				if (toolComponentMap[tool])
+				const parts = hash.split('/')
+				if (parts.length >= 2)
 				{
-					currentSection.value = sec
-					currentTool.value = tool
+					const sec = parts[0]
+					const tool = parts[1]
+					if (toolComponentMap[tool])
+					{
+						currentSection.value = sec
+						currentTool.value = tool
+						return true
+					}
 				}
+			}
+
+			return false
+		}
+
+		const updateUrlState = (secId, toolId) =>
+		{
+			// Update both query params and hash for maximum GAS iframe compatibility
+			const url = new URL(window.location.href)
+			url.searchParams.set('section', secId)
+			url.searchParams.set('tool', toolId)
+			url.hash = `#${secId}/${toolId}`
+
+			try
+			{
+				window.history.replaceState({}, '', url.toString())
+			}
+			catch (err)
+			{
+				// Fallback to hash if history API is restricted
+				window.location.hash = `#${secId}/${toolId}`
 			}
 		}
 
@@ -120,30 +154,29 @@ export default {
 		{
 			currentSection.value = secId
 			currentTool.value = toolId
-			window.location.hash = `#${secId}/${toolId}`
+			updateUrlState(secId, toolId)
 		}
 
-		const handleHashChange = () =>
+		const handlePopState = () =>
 		{
-			parseHash()
+			parseUrlState()
 		}
 
 		onMounted(() =>
 		{
-			if (window.location.hash)
+			const found = parseUrlState()
+			if (!found)
 			{
-				parseHash()
+				updateUrlState(currentSection.value, currentTool.value)
 			}
-			else
-			{
-				window.location.hash = `#${currentSection.value}/${currentTool.value}`
-			}
-			window.addEventListener('hashchange', handleHashChange)
+			window.addEventListener('popstate', handlePopState)
+			window.addEventListener('hashchange', handlePopState)
 		})
 
 		onUnmounted(() =>
 		{
-			window.removeEventListener('hashchange', handleHashChange)
+			window.removeEventListener('popstate', handlePopState)
+			window.removeEventListener('hashchange', handlePopState)
 		})
 
 		return {
