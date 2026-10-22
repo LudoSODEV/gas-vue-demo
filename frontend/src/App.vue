@@ -105,26 +105,8 @@ export default {
 			}
 		}
 
-		const parseInitialState = () =>
+		const parseQueryState = () =>
 		{
-			// 1. Check hash fragments (e.g. #sect1/tool1-1)
-			const hash = window.location.hash.replace('#', '')
-			if (hash)
-			{
-				const parts = hash.split('/')
-				if (parts.length >= 2)
-				{
-					const sec = parts[0]
-					const tool = parts[1]
-					if (toolComponentMap[tool])
-					{
-						applyState(sec, tool)
-						return true
-					}
-				}
-			}
-
-			// 2. Check query parameters fallback
 			const params = new URLSearchParams(window.location.search)
 			const qSec = params.get('section') || params.get('sect')
 			const qTool = params.get('tool')
@@ -133,47 +115,31 @@ export default {
 				applyState(qSec, qTool)
 				return true
 			}
-
 			return false
 		}
 
-		const updateHistoryState = (secId, toolId, isPush = true) =>
+		const updateQueryState = (secId, toolId, isPush = true) =>
 		{
-			const token = `${secId}/${toolId}`
+			const url = new URL(window.location.href)
+			url.searchParams.set('section', secId)
+			url.searchParams.set('tool', toolId)
+			url.hash = '' // Ensure no hash is used
 
-			if (typeof google !== 'undefined' && google.script && google.script.history)
+			const stateObj = { section: secId, tool: toolId }
+			if (isPush)
 			{
-				if (isPush)
-				{
-					google.script.history.push(null, token)
-				}
-				else
-				{
-					google.script.history.replace(null, token)
-				}
+				window.history.pushState(stateObj, '', url.toString())
 			}
 			else
 			{
-				// Fallback for local development
-				const url = new URL(window.location.href)
-				url.searchParams.delete('section')
-				url.searchParams.delete('tool')
-				url.hash = `#${token}`
-				if (isPush)
-				{
-					window.history.pushState({ section: secId, tool: toolId }, '', url.toString())
-				}
-				else
-				{
-					window.history.replaceState({ section: secId, tool: toolId }, '', url.toString())
-				}
+				window.history.replaceState(stateObj, '', url.toString())
 			}
 		}
 
 		const selectTool = (secId, toolId) =>
 		{
 			applyState(secId, toolId)
-			updateHistoryState(secId, toolId, true)
+			updateQueryState(secId, toolId, true)
 		}
 
 		const handlePopState = (e) =>
@@ -184,54 +150,31 @@ export default {
 			}
 			else
 			{
-				parseInitialState()
+				const found = parseQueryState()
+				if (!found)
+				{
+					applyState('sect1', 'tool1-1')
+				}
 			}
 		}
 
 		onMounted(() =>
 		{
-			const found = parseInitialState()
+			const found = parseQueryState()
 			if (!found)
 			{
-				updateHistoryState(currentSection.value, currentTool.value, false)
+				updateQueryState(currentSection.value, currentTool.value, false)
 			}
 			else
 			{
-				updateHistoryState(currentSection.value, currentTool.value, false)
+				updateQueryState(currentSection.value, currentTool.value, false)
 			}
-
-			if (typeof google !== 'undefined' && google.script && google.script.history)
-			{
-				google.script.history.setChangeHandler((e) =>
-				{
-					if (e && e.token)
-					{
-						const parts = e.token.split('/')
-						if (parts.length >= 2)
-						{
-							applyState(parts[0], parts[1])
-						}
-					}
-					else if (e && e.state && e.state.section && e.state.tool)
-					{
-						applyState(e.state.section, e.state.tool)
-					}
-				})
-			}
-			else
-			{
-				window.addEventListener('popstate', handlePopState)
-				window.addEventListener('hashchange', handlePopState)
-			}
+			window.addEventListener('popstate', handlePopState)
 		})
 
 		onUnmounted(() =>
 		{
-			if (typeof google === 'undefined' || !google.script || !google.script.history)
-			{
-				window.removeEventListener('popstate', handlePopState)
-				window.removeEventListener('hashchange', handlePopState)
-			}
+			window.removeEventListener('popstate', handlePopState)
 		})
 
 		return {
