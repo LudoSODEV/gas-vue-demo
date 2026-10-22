@@ -2,7 +2,7 @@
 	<div class="app-container">
 		<header class="app-header">
 			<h1>GAS Vue Demo</h1>
-			<p class="subtitle">Stateful Multi-Tool Application (google.script.history)</p>
+			<p class="subtitle">Stateful Multi-Tool Application</p>
 		</header>
 
 		<div class="main-layout">
@@ -107,17 +107,7 @@ export default {
 
 		const parseInitialState = () =>
 		{
-			// 1. Check query parameters
-			const params = new URLSearchParams(window.location.search)
-			const qSec = params.get('section') || params.get('sect')
-			const qTool = params.get('tool')
-			if (qSec && qTool && toolComponentMap[qTool])
-			{
-				applyState(qSec, qTool)
-				return true
-			}
-
-			// 2. Check hash fragments
+			// 1. Check hash fragments (e.g. #sect1/tool1-1)
 			const hash = window.location.hash.replace('#', '')
 			if (hash)
 			{
@@ -134,39 +124,48 @@ export default {
 				}
 			}
 
+			// 2. Check query parameters fallback
+			const params = new URLSearchParams(window.location.search)
+			const qSec = params.get('section') || params.get('sect')
+			const qTool = params.get('tool')
+			if (qSec && qTool && toolComponentMap[qTool])
+			{
+				applyState(qSec, qTool)
+				return true
+			}
+
 			return false
 		}
 
 		const updateHistoryState = (secId, toolId, isPush = true) =>
 		{
 			const token = `${secId}/${toolId}`
-			const stateObj = { section: secId, tool: toolId }
 
 			if (typeof google !== 'undefined' && google.script && google.script.history)
 			{
 				if (isPush)
 				{
-					google.script.history.push(stateObj, token)
+					google.script.history.push(null, token)
 				}
 				else
 				{
-					google.script.history.replace(stateObj, token)
+					google.script.history.replace(null, token)
 				}
 			}
 			else
 			{
-				// Fallback to HTML5 History API & hash for local development
+				// Fallback for local development
 				const url = new URL(window.location.href)
-				url.searchParams.set('section', secId)
-				url.searchParams.set('tool', toolId)
+				url.searchParams.delete('section')
+				url.searchParams.delete('tool')
 				url.hash = `#${token}`
 				if (isPush)
 				{
-					window.history.pushState(stateObj, '', url.toString())
+					window.history.pushState({ section: secId, tool: toolId }, '', url.toString())
 				}
 				else
 				{
-					window.history.replaceState(stateObj, '', url.toString())
+					window.history.replaceState({ section: secId, tool: toolId }, '', url.toString())
 				}
 			}
 		}
@@ -205,7 +204,15 @@ export default {
 			{
 				google.script.history.setChangeHandler((e) =>
 				{
-					if (e && e.state && e.state.section && e.state.tool)
+					if (e && e.token)
+					{
+						const parts = e.token.split('/')
+						if (parts.length >= 2)
+						{
+							applyState(parts[0], parts[1])
+						}
+					}
+					else if (e && e.state && e.state.section && e.state.tool)
 					{
 						applyState(e.state.section, e.state.tool)
 					}
